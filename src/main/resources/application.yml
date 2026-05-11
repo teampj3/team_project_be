@@ -1,0 +1,23 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: team-project-be
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+ai-service:
+  base-url: ${AI_SERVICE_BASE_URL:http://localhost:8000}
+  generate-path: ${AI_SERVICE_GENERATE_PATH:/internal/ai/reports/generate}
+  timeout-seconds: ${AI_SERVICE_TIMEOUT_SECONDS:60}
+  local-stub-enabled: ${AI_SERVICE_LOCAL_STUB_ENABLED:true}
+
+pipeline:
+  runs-root: ${PIPELINE_RUNS_ROOT:/Users/jeongseog-u/VSCode-workspace/TeamProject2026/outputs/runs}
+  run-path: ${PIPELINE_RUN_PATH:/internal/pipeline/run}
+  timeout-seconds: ${PIPELINE_TIMEOUT_SECONDS:15}

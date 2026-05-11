@@ -1,0 +1,27 @@
+services:
+  spring-api:
+    build:
+      context: .
+    container_name: team-project-spring-api
+    ports:
+      - "8080:8080"
+    environment:
+      AI_SERVICE_BASE_URL: http://python-ai:8000
+      AI_SERVICE_LOCAL_STUB_ENABLED: "false"
+      PIPELINE_RUNS_ROOT: /pipeline/outputs/runs
+    depends_on:
+      - python-ai
+    volumes:
+      - pipeline-runs:/pipeline/outputs/runs
+    restart: unless-stopped
+
+  python-ai:
+    build:
+      context: /Users/jeongseog-u/VSCode-workspace/TeamProject2026
+    container_name: team-project-python-ai
+    volumes:
+      - pipeline-runs:/app/outputs/runs
+    restart: unless-stopped
+
+volumes:
+  pipeline-runs:
