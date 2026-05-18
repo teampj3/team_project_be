@@ -1,5 +1,9 @@
 package com.teamproject.report.report.controller;
 
+import com.teamproject.report.archive.exception.ArchiveNotFoundException;
+import com.teamproject.report.auth.exception.AuthException;
+import com.teamproject.report.auth.exception.InvalidUpdateRequestException;
+import com.teamproject.report.auth.exception.UserAlreadyExistsException;
 import com.teamproject.report.pipeline.exception.PipelineRunNotFoundException;
 import com.teamproject.report.pipeline.exception.PipelineStartException;
 import com.teamproject.report.report.service.ReportNotFoundException;
@@ -43,6 +47,42 @@ public class ApiExceptionHandler {
         problem.setTitle("Pipeline start failed");
         problem.setDetail(e.getMessage());
         problem.setProperty("errorCode", "PIPELINE_START_FAILED");
+        return problem;
+    }
+
+    @ExceptionHandler(UserAlreadyExistsException.class)
+    ProblemDetail handleUserAlreadyExists(UserAlreadyExistsException e) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.CONFLICT);
+        problem.setTitle("User already exists");
+        problem.setDetail(e.getMessage());
+        problem.setProperty("errorCode", "USER_ALREADY_EXISTS");
+        return problem;
+    }
+
+    @ExceptionHandler(AuthException.class)
+    ProblemDetail handleAuth(AuthException e) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.UNAUTHORIZED);
+        problem.setTitle("Authentication failed");
+        problem.setDetail(e.getMessage());
+        problem.setProperty("errorCode", "AUTH_FAILED");
+        return problem;
+    }
+
+    @ExceptionHandler(InvalidUpdateRequestException.class)
+    ProblemDetail handleInvalidUpdateRequest(InvalidUpdateRequestException e) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.BAD_REQUEST);
+        problem.setTitle("Invalid update request");
+        problem.setDetail(e.getMessage());
+        problem.setProperty("errorCode", "INVALID_UPDATE_REQUEST");
+        return problem;
+    }
+
+    @ExceptionHandler(ArchiveNotFoundException.class)
+    ProblemDetail handleArchiveNotFound(ArchiveNotFoundException e) {
+        ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.NOT_FOUND);
+        problem.setTitle("Archive not found");
+        problem.setDetail(e.getMessage());
+        problem.setProperty("errorCode", "ARCHIVE_NOT_FOUND");
         return problem;
     }
 }
