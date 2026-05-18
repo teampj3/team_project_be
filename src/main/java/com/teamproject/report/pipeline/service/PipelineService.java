@@ -1,6 +1,9 @@
 package com.teamproject.report.pipeline.service;
 
 import com.teamproject.report.config.PipelineProperties;
+import com.teamproject.report.archive.service.ArchiveService;
+import com.teamproject.report.auth.model.UserAccount;
+import com.teamproject.report.auth.service.AuthService;
 import com.teamproject.report.pipeline.dto.PipelineRunRequest;
 import com.teamproject.report.pipeline.dto.PipelineResultResponse;
 import com.teamproject.report.pipeline.dto.PipelineRunResponse;
@@ -26,21 +29,28 @@ public class PipelineService {
     private final PipelineRunRegistry registry;
     private final PipelineFileService pipelineFileService;
     private final WebClient aiWebClient;
+    private final AuthService authService;
+    private final ArchiveService archiveService;
 
     public PipelineService(
             PipelineProperties properties,
             PipelineRunRegistry registry,
             PipelineFileService pipelineFileService,
-            WebClient aiWebClient
+            WebClient aiWebClient,
+            AuthService authService,
+            ArchiveService archiveService
     ) {
         this.properties = properties;
         this.registry = registry;
         this.pipelineFileService = pipelineFileService;
         this.aiWebClient = aiWebClient;
+        this.authService = authService;
+        this.archiveService = archiveService;
     }
 
-    public PipelineRunResponse startRun(String topic) {
+    public PipelineRunResponse startRun(String authorization, String topic) {
         try {
+            UserAccount user = resolveCurrentUser(authorization);
             PipelineRunResponse pythonResponse = aiWebClient.post()
                     .uri(properties.getRunPath())
                     .bodyValue(new PipelineRunRequest(topic))
@@ -56,10 +66,14 @@ public class PipelineService {
             PipelineRunMetadata metadata = new PipelineRunMetadata(
                     runId,
                     UUID.randomUUID(),
+                    user == null ? null : user.getId(),
                     topic,
                     Instant.now()
             );
             registry.register(metadata);
+            if (user != null) {
+                archiveService.autoSavePipelineSnapshot(user, metadata);
+            }
 
             StatusSnapshot status = safeReadStatus(runId);
             return new PipelineRunResponse(
@@ -80,6 +94,9 @@ public class PipelineService {
                 .orElseThrow(() -> new PipelineRunNotFoundException(runId));
 
         StatusSnapshot status = safeReadStatus(runId);
+        if (metadata.userId() != null) {
+            archiveService.autoSavePipelineSnapshot(metadata.userId(), metadata.reportId());
+        }
         return new PipelineResultResponse(
                 runId,
                 metadata.reportId(),
@@ -133,5 +150,12 @@ public class PipelineService {
         } catch (PipelineRunNotFoundException e) {
             return StatusSnapshot.pending();
         }
+    }
+
+    private UserAccount resolveCurrentUser(String authorization) {
+        if (authorization == null || authorization.isBlank()) {
+            return null;
+        }
+        return authService.requireCurrentUser(authorization);
     }
 }

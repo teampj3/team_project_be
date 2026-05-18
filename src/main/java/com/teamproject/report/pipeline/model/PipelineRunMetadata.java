@@ -6,6 +6,7 @@ import java.util.UUID;
 public record PipelineRunMetadata(
         String runId,
         UUID reportId,
+        UUID userId,
         String topic,
         Instant createdAt
 ) {
