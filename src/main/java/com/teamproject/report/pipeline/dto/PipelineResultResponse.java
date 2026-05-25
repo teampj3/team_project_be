@@ -14,6 +14,7 @@ public record PipelineResultResponse(
         int summaryCount,
         int relevanceCount,
         String reportPath,
+        VisualizationInfoResponse visualization,
         Instant startedAt,
         Instant finishedAt,
         ReportStatus status,

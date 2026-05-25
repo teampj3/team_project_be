@@ -21,8 +21,12 @@ class PipelineFileServiceTest {
 
     @Test
     void readsRunScopedFilesAndBuildsFrontendDtos() throws Exception {
-        Path runDir = tempDir.resolve("run-123");
+        Path outputsDir = tempDir.resolve("outputs");
+        Path runsDir = outputsDir.resolve("runs");
+        Path runDir = runsDir.resolve("run-123");
         Files.createDirectories(runDir);
+        Files.createDirectories(outputsDir.resolve("visualizations"));
+        Files.createDirectories(outputsDir.resolve("reports"));
 
         Files.writeString(runDir.resolve("status.json"), """
                 {
@@ -67,9 +71,18 @@ class PipelineFileServiceTest {
                   }
                 ]
                 """);
+        Files.writeString(outputsDir.resolve("visualizations").resolve("code_review_visualization_manifest.json"), """
+                {
+                  "topic": "code review",
+                  "visual_assets": {
+                    "visual_1": "/tmp/outputs/visualizations/code_review_visual_1.png"
+                  },
+                  "visualized_report": "/tmp/outputs/reports/code_review_visualized.md"
+                }
+                """);
 
         PipelineProperties properties = new PipelineProperties();
-        properties.setRunsRoot(tempDir.toString());
+        properties.setRunsRoot(runsDir.toString());
 
         PipelineFileService service = new PipelineFileService(new ObjectMapper(), properties);
 
@@ -83,5 +96,13 @@ class PipelineFileServiceTest {
         assertThat(relevanceResults).hasSize(1);
         assertThat(relevanceResults.getFirst().relevanceScore()).isEqualTo(91.2);
         assertThat(relevanceResults.getFirst().selected()).isTrue();
+
+        assertThat(service.readVisualization("code review")).isNotNull();
+        assertThat(service.readVisualization("code review").manifestPath())
+                .isEqualTo("outputs/visualizations/code_review_visualization_manifest.json");
+        assertThat(service.readVisualization("code review").assets())
+                .containsEntry("visual_1", "outputs/visualizations/code_review_visual_1.png");
+        assertThat(service.readVisualization("code review").visualizedReportPath())
+                .isEqualTo("outputs/reports/code_review_visualized.md");
     }
 }

@@ -9,6 +9,7 @@ import com.teamproject.report.pipeline.dto.PipelineResultResponse;
 import com.teamproject.report.pipeline.dto.PipelineRunResponse;
 import com.teamproject.report.pipeline.dto.RelevancePaperResponse;
 import com.teamproject.report.pipeline.dto.SearchPaperResponse;
+import com.teamproject.report.pipeline.dto.VisualizationInfoResponse;
 import com.teamproject.report.pipeline.exception.PipelineRunNotFoundException;
 import com.teamproject.report.pipeline.exception.PipelineStartException;
 import com.teamproject.report.pipeline.model.PipelineRunMetadata;
@@ -94,6 +95,7 @@ public class PipelineService {
                 .orElseThrow(() -> new PipelineRunNotFoundException(runId));
 
         StatusSnapshot status = safeReadStatus(runId);
+        VisualizationInfoResponse visualization = pipelineFileService.readVisualization(metadata.topic());
         if (metadata.userId() != null) {
             archiveService.autoSavePipelineSnapshot(metadata.userId(), metadata.reportId());
         }
@@ -106,6 +108,7 @@ public class PipelineService {
                 status.summaryCount(),
                 status.relevanceCount(),
                 pipelineFileService.resolveReportPath(runId),
+                visualization,
                 status.startedAt(),
                 status.finishedAt(),
                 status.status(),

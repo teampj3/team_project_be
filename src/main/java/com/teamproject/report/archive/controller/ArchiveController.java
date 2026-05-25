@@ -1,5 +1,6 @@
 package com.teamproject.report.archive.controller;
 
+import com.teamproject.report.archive.dto.ArchiveDetailResponse;
 import com.teamproject.report.archive.dto.ArchiveResponse;
 import com.teamproject.report.archive.dto.SaveArchiveRequest;
 import com.teamproject.report.archive.service.ArchiveService;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.DeleteMapping;
 
 import java.util.List;
 import java.util.UUID;
@@ -42,10 +44,19 @@ public class ArchiveController {
     }
 
     @GetMapping("/{archiveId}")
-    public ArchiveResponse get(
+    public ArchiveDetailResponse get(
             @RequestHeader("Authorization") String authorization,
             @PathVariable UUID archiveId
     ) {
-        return archiveService.get(authorization, archiveId);
+        return archiveService.getDetail(authorization, archiveId);
+    }
+
+    @DeleteMapping("/{archiveId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(
+            @RequestHeader("Authorization") String authorization,
+            @PathVariable UUID archiveId
+    ) {
+        archiveService.delete(authorization, archiveId);
     }
 }

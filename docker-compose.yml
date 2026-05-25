@@ -13,16 +13,18 @@ services:
     depends_on:
       - python-ai
     volumes:
-      - pipeline-runs:/pipeline/outputs/runs
+      - pipeline-outputs:/pipeline/outputs
     restart: unless-stopped
 
   python-ai:
     build:
       context: /Users/jeongseog-u/VSCode-workspace/TeamProject2026
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     container_name: team-project-python-ai
     volumes:
-      - pipeline-runs:/app/outputs/runs
+      - pipeline-outputs:/app/outputs
     restart: unless-stopped
 
 volumes:
-  pipeline-runs:
+  pipeline-outputs:

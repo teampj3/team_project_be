@@ -6,7 +6,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.teamproject.report.config.PipelineProperties;
 import com.teamproject.report.pipeline.dto.RelevancePaperResponse;
+import com.teamproject.report.pipeline.dto.ReaderPaperResponse;
 import com.teamproject.report.pipeline.dto.SearchPaperResponse;
+import com.teamproject.report.pipeline.dto.VisualizationInfoResponse;
 import com.teamproject.report.pipeline.exception.PipelineRunNotFoundException;
 import com.teamproject.report.pipeline.model.PipelineStage;
 import com.teamproject.report.pipeline.model.StatusSnapshot;
@@ -17,11 +19,15 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 @Service
 public class PipelineFileService {
@@ -127,6 +133,32 @@ public class PipelineFileService {
         return results;
     }
 
+    public List<ReaderPaperResponse> readReaderResults(String runId) {
+        List<SearchResultFile> searchRows = readList(runId, "search_results.json", new TypeReference<>() {});
+        List<ReaderResultFile> readerRows = readList(runId, "reader_results.json", new TypeReference<>() {});
+
+        Map<String, SearchResultFile> searchById = new HashMap<>();
+        for (SearchResultFile row : searchRows) {
+            searchById.put(row.id, row);
+        }
+
+        List<ReaderPaperResponse> results = new ArrayList<>();
+        for (ReaderResultFile row : readerRows) {
+            SearchResultFile paper = searchById.get(row.id);
+            if (paper == null) {
+                continue;
+            }
+            results.add(new ReaderPaperResponse(
+                    paper.title,
+                    paper.authors == null ? List.of() : paper.authors,
+                    paper.year,
+                    paper.source,
+                    row.summary
+            ));
+        }
+        return results;
+    }
+
     public AiReportResponse readWriterOutput(String runId) {
         Path writerPath = resolveRunDir(runId).resolve("writer_output.json");
         if (!Files.exists(writerPath)) {
@@ -143,6 +175,41 @@ public class PipelineFileService {
     public String resolveReportPath(String runId) {
         Path reportPath = resolveRunDir(runId).resolve("report.md");
         return Files.exists(reportPath) ? "outputs/runs/" + runId + "/report.md" : null;
+    }
+
+    public VisualizationInfoResponse readVisualization(String topic) {
+        Path visualizationsDir = resolveOutputsRoot().resolve("visualizations");
+        if (!Files.isDirectory(visualizationsDir)) {
+            return null;
+        }
+
+        try (Stream<Path> stream = Files.list(visualizationsDir)) {
+            Path manifestPath = stream
+                    .filter(path -> path.getFileName().toString().endsWith("_visualization_manifest.json"))
+                    .filter(path -> matchesTopic(path, topic))
+                    .max(Comparator.comparing(this::lastModifiedTime))
+                    .orElse(null);
+
+            if (manifestPath == null) {
+                return null;
+            }
+
+            VisualizationManifestFile manifest = objectMapper.readValue(manifestPath.toFile(), VisualizationManifestFile.class);
+            Map<String, String> assets = new LinkedHashMap<>();
+            if (manifest.visualAssets != null) {
+                for (Map.Entry<String, String> entry : manifest.visualAssets.entrySet()) {
+                    assets.put(entry.getKey(), normalizeOutputPath(entry.getValue()));
+                }
+            }
+
+            return new VisualizationInfoResponse(
+                    normalizeOutputPath(manifestPath),
+                    assets,
+                    normalizeOutputPath(manifest.visualizedReport)
+            );
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to read visualization output", e);
+        }
     }
 
     private ReportStatus mapStatus(StatusFile statusFile) {
@@ -198,6 +265,15 @@ public class PipelineFileService {
         return runDir;
     }
 
+    private Path resolveOutputsRoot() {
+        Path runsRoot = Path.of(properties.getRunsRoot());
+        Path fileName = runsRoot.getFileName();
+        if (fileName != null && "runs".equals(fileName.toString()) && runsRoot.getParent() != null) {
+            return runsRoot.getParent();
+        }
+        return runsRoot;
+    }
+
     private <T> List<T> readList(String runId, String fileName, TypeReference<List<T>> typeReference) {
         Path path = resolveRunDir(runId).resolve(fileName);
         if (!Files.exists(path)) {
@@ -209,6 +285,49 @@ public class PipelineFileService {
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read pipeline file: " + fileName, e);
         }
+    }
+
+    private boolean matchesTopic(Path manifestPath, String topic) {
+        try {
+            VisualizationManifestFile manifest = objectMapper.readValue(manifestPath.toFile(), VisualizationManifestFile.class);
+            return manifest.topic != null && manifest.topic.equalsIgnoreCase(topic);
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private FileTime lastModifiedTime(Path path) {
+        try {
+            return Files.getLastModifiedTime(path);
+        } catch (IOException e) {
+            return FileTime.fromMillis(0);
+        }
+    }
+
+    private String normalizeOutputPath(Path path) {
+        return normalizeOutputPath(path == null ? null : path.toString());
+    }
+
+    private String normalizeOutputPath(String pathValue) {
+        if (pathValue == null || pathValue.isBlank()) {
+            return null;
+        }
+
+        Path outputsRoot = resolveOutputsRoot();
+        Path path = Path.of(pathValue);
+        if (path.startsWith(outputsRoot)) {
+            return "outputs/" + outputsRoot.relativize(path).toString().replace('\\', '/');
+        }
+
+        String normalized = pathValue.replace('\\', '/');
+        int outputsIndex = normalized.indexOf("/outputs/");
+        if (outputsIndex >= 0) {
+            return normalized.substring(outputsIndex + 1);
+        }
+        if (normalized.startsWith("outputs/")) {
+            return normalized;
+        }
+        return normalized;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -256,5 +375,14 @@ public class PipelineFileService {
         @JsonProperty("relevance_score")
         public double relevanceScore;
         public boolean selected;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private static class VisualizationManifestFile {
+        public String topic;
+        @JsonProperty("visual_assets")
+        public Map<String, String> visualAssets;
+        @JsonProperty("visualized_report")
+        public String visualizedReport;
     }
 }

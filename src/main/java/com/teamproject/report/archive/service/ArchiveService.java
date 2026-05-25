@@ -1,5 +1,6 @@
 package com.teamproject.report.archive.service;
 
+import com.teamproject.report.archive.dto.ArchiveDetailResponse;
 import com.teamproject.report.archive.dto.ArchiveResponse;
 import com.teamproject.report.archive.dto.SaveArchiveRequest;
 import com.teamproject.report.archive.exception.ArchiveNotFoundException;
@@ -9,12 +10,17 @@ import com.teamproject.report.auth.model.UserAccount;
 import com.teamproject.report.auth.repository.UserAccountRepository;
 import com.teamproject.report.auth.service.AuthService;
 import com.teamproject.report.pipeline.exception.PipelineRunNotFoundException;
+import com.teamproject.report.pipeline.dto.PipelineResultResponse;
+import com.teamproject.report.pipeline.dto.RelevancePaperResponse;
+import com.teamproject.report.pipeline.dto.ReaderPaperResponse;
+import com.teamproject.report.pipeline.dto.SearchPaperResponse;
+import com.teamproject.report.pipeline.dto.VisualizationInfoResponse;
 import com.teamproject.report.pipeline.model.PipelineRunMetadata;
 import com.teamproject.report.pipeline.model.StatusSnapshot;
 import com.teamproject.report.pipeline.service.PipelineFileService;
 import com.teamproject.report.pipeline.service.PipelineRunRegistry;
-import com.teamproject.report.report.dto.ReportResponse;
 import com.teamproject.report.report.dto.AiReportResponse;
+import com.teamproject.report.report.dto.ReportResponse;
 import com.teamproject.report.report.model.ReportStatus;
 import com.teamproject.report.report.service.ReportNotFoundException;
 import com.teamproject.report.report.service.ReportService;
@@ -81,6 +87,44 @@ public class ArchiveService {
         ArchiveEntry entry = archiveEntryRepository.findByIdAndUserId(archiveId, user.getId())
                 .orElseThrow(() -> new ArchiveNotFoundException(archiveId));
         return ArchiveResponse.from(entry);
+    }
+
+    @Transactional(readOnly = true)
+    public ArchiveDetailResponse getDetail(String authorization, UUID archiveId) {
+        UserAccount user = authService.requireCurrentUser(authorization);
+        ArchiveEntry entry = archiveEntryRepository.findByIdAndUserId(archiveId, user.getId())
+                .orElseThrow(() -> new ArchiveNotFoundException(archiveId));
+
+        PipelineResultResponse pipelineResult = null;
+        VisualizationInfoResponse visualization = null;
+        List<SearchPaperResponse> searchResults = List.of();
+        List<ReaderPaperResponse> readerResults = List.of();
+        List<RelevancePaperResponse> relevanceResults = List.of();
+
+        if (entry.getRunId() != null && !entry.getRunId().isBlank()) {
+            visualization = safeReadVisualization(entry.getTopic());
+            pipelineResult = buildPipelineResult(entry, visualization);
+            searchResults = safeReadSearchResults(entry.getRunId());
+            readerResults = safeReadReaderResults(entry.getRunId());
+            relevanceResults = safeReadRelevanceResults(entry.getRunId());
+        }
+
+        return ArchiveDetailResponse.from(
+                entry,
+                pipelineResult,
+                visualization,
+                searchResults,
+                readerResults,
+                relevanceResults
+        );
+    }
+
+    @Transactional
+    public void delete(String authorization, UUID archiveId) {
+        UserAccount user = authService.requireCurrentUser(authorization);
+        ArchiveEntry entry = archiveEntryRepository.findByIdAndUserId(archiveId, user.getId())
+                .orElseThrow(() -> new ArchiveNotFoundException(archiveId));
+        archiveEntryRepository.delete(entry);
     }
 
     @Transactional
@@ -167,6 +211,58 @@ public class ArchiveService {
             return pipelineFileService.readWriterOutput(runId);
         } catch (PipelineRunNotFoundException e) {
             return new AiReportResponse("", "", List.of(), List.of(), "", "");
+        }
+    }
+
+    private PipelineResultResponse buildPipelineResult(ArchiveEntry entry, VisualizationInfoResponse visualization) {
+        StatusSnapshot status = safeReadStatus(entry.getRunId());
+        return new PipelineResultResponse(
+                entry.getRunId(),
+                entry.getReportId(),
+                entry.getTopic(),
+                status.currentStage().value(),
+                status.searchCount(),
+                status.summaryCount(),
+                status.relevanceCount(),
+                pipelineFileService.resolveReportPath(entry.getRunId()),
+                visualization,
+                status.startedAt(),
+                status.finishedAt(),
+                status.status(),
+                status.message(),
+                status.errorCode()
+        );
+    }
+
+    private VisualizationInfoResponse safeReadVisualization(String topic) {
+        try {
+            return pipelineFileService.readVisualization(topic);
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private List<SearchPaperResponse> safeReadSearchResults(String runId) {
+        try {
+            return pipelineFileService.readSearchResults(runId);
+        } catch (PipelineRunNotFoundException e) {
+            return List.of();
+        }
+    }
+
+    private List<ReaderPaperResponse> safeReadReaderResults(String runId) {
+        try {
+            return pipelineFileService.readReaderResults(runId);
+        } catch (PipelineRunNotFoundException e) {
+            return List.of();
+        }
+    }
+
+    private List<RelevancePaperResponse> safeReadRelevanceResults(String runId) {
+        try {
+            return pipelineFileService.readRelevanceResults(runId);
+        } catch (PipelineRunNotFoundException e) {
+            return List.of();
         }
     }
 }
