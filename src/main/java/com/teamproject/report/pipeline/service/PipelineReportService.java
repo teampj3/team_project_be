@@ -32,6 +32,7 @@ public class PipelineReportService {
     private ReportResponse build(PipelineRunMetadata metadata) {
         AiReportResponse writerOutput = pipelineFileService.readWriterOutput(metadata.runId());
         StatusSnapshot status = pipelineFileService.readStatus(metadata.runId());
+        String preferredReportContent = pipelineFileService.readPreferredReportContent(metadata.runId(), metadata.topic());
         Instant startedAt = status.startedAt() == null ? metadata.createdAt() : status.startedAt();
         Instant updatedAt = status.finishedAt() == null ? startedAt : status.finishedAt();
 
@@ -44,7 +45,9 @@ public class PipelineReportService {
                 writerOutput.commonHighlights(),
                 writerOutput.differentHighlights(),
                 writerOutput.reviewResult(),
-                writerOutput.mergedReport(),
+                preferredReportContent == null || preferredReportContent.isBlank()
+                        ? writerOutput.mergedReport()
+                        : preferredReportContent,
                 status.message(),
                 startedAt,
                 updatedAt

@@ -177,6 +177,35 @@ public class PipelineFileService {
         return Files.exists(reportPath) ? "outputs/runs/" + runId + "/report.md" : null;
     }
 
+    public String resolvePreferredReportPath(String runId, String topic) {
+        VisualizationInfoResponse visualization = readVisualization(topic);
+        if (visualization != null && visualization.visualizedReportPath() != null) {
+            return visualization.visualizedReportPath();
+        }
+        return resolveReportPath(runId);
+    }
+
+    public String readPreferredReportContent(String runId, String topic) {
+        VisualizationInfoResponse visualization = readVisualization(topic);
+        if (visualization != null && visualization.visualizedReportPath() != null) {
+            String visualizedReport = readOutputContent(visualization.visualizedReportPath());
+            if (visualizedReport != null) {
+                return normalizeMarkdownAssetPaths(visualizedReport);
+            }
+        }
+
+        Path reportPath = resolveRunDir(runId).resolve("report.md");
+        if (!Files.exists(reportPath)) {
+            return null;
+        }
+
+        try {
+            return normalizeMarkdownAssetPaths(Files.readString(reportPath));
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to read report markdown", e);
+        }
+    }
+
     public VisualizationInfoResponse readVisualization(String topic) {
         Path visualizationsDir = resolveOutputsRoot().resolve("visualizations");
         if (!Files.isDirectory(visualizationsDir)) {
@@ -327,6 +356,46 @@ public class PipelineFileService {
         if (normalized.startsWith("outputs/")) {
             return normalized;
         }
+        return normalized;
+    }
+
+    private String readOutputContent(String relativeOutputPath) {
+        if (relativeOutputPath == null || relativeOutputPath.isBlank()) {
+            return null;
+        }
+
+        String normalized = normalizeOutputPath(relativeOutputPath);
+        if (normalized == null || !normalized.startsWith("outputs/")) {
+            return null;
+        }
+
+        Path path = resolveOutputsRoot().resolve(normalized.substring("outputs/".length()));
+        if (!Files.exists(path)) {
+            return null;
+        }
+
+        try {
+            return Files.readString(path);
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to read output file: " + normalized, e);
+        }
+    }
+
+    private String normalizeMarkdownAssetPaths(String markdown) {
+        if (markdown == null || markdown.isBlank()) {
+            return markdown;
+        }
+
+        Path outputsRoot = resolveOutputsRoot().toAbsolutePath().normalize();
+        String normalized = markdown.replace('\\', '/');
+        String outputsRootPrefix = outputsRoot.toString().replace('\\', '/');
+
+        normalized = normalized.replace(outputsRootPrefix + "/", "/outputs/");
+        normalized = normalized.replace(outputsRootPrefix, "/outputs");
+        normalized = normalized.replace("/app/outputs/", "/outputs/");
+        normalized = normalized.replace("/pipeline/outputs/", "/outputs/");
+        normalized = normalized.replaceAll("/(?:[^\\s)\"']+/)*outputs/", "/outputs/");
+
         return normalized;
     }
 

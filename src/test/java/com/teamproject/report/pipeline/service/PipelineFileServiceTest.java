@@ -80,6 +80,11 @@ class PipelineFileServiceTest {
                   "visualized_report": "/tmp/outputs/reports/code_review_visualized.md"
                 }
                 """);
+        Files.writeString(outputsDir.resolve("reports").resolve("code_review_visualized.md"), """
+                # Visualized Report
+
+                ![visual](/tmp/outputs/visualizations/code_review_visual_1.png)
+                """);
 
         PipelineProperties properties = new PipelineProperties();
         properties.setRunsRoot(runsDir.toString());
@@ -104,5 +109,9 @@ class PipelineFileServiceTest {
                 .containsEntry("visual_1", "outputs/visualizations/code_review_visual_1.png");
         assertThat(service.readVisualization("code review").visualizedReportPath())
                 .isEqualTo("outputs/reports/code_review_visualized.md");
+        assertThat(service.resolvePreferredReportPath("run-123", "code review"))
+                .isEqualTo("outputs/reports/code_review_visualized.md");
+        assertThat(service.readPreferredReportContent("run-123", "code review"))
+                .contains("![visual](/outputs/visualizations/code_review_visual_1.png)");
     }
 }

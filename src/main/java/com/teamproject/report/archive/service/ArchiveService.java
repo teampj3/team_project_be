@@ -179,6 +179,7 @@ public class ArchiveService {
     private ReportResponse buildPipelineSnapshot(PipelineRunMetadata metadata) {
         StatusSnapshot status = safeReadStatus(metadata.runId());
         AiReportResponse writerOutput = safeReadWriterOutput(metadata.runId());
+        String preferredReportContent = pipelineFileService.readPreferredReportContent(metadata.runId(), metadata.topic());
         var createdAt = status.startedAt() == null ? metadata.createdAt() : status.startedAt();
         var updatedAt = status.finishedAt() == null ? createdAt : status.finishedAt();
 
@@ -191,7 +192,9 @@ public class ArchiveService {
                 writerOutput.commonHighlights(),
                 writerOutput.differentHighlights(),
                 writerOutput.reviewResult(),
-                writerOutput.mergedReport(),
+                preferredReportContent == null || preferredReportContent.isBlank()
+                        ? writerOutput.mergedReport()
+                        : preferredReportContent,
                 status.status() == ReportStatus.FAILED ? status.message() : null,
                 createdAt,
                 updatedAt
@@ -224,7 +227,7 @@ public class ArchiveService {
                 status.searchCount(),
                 status.summaryCount(),
                 status.relevanceCount(),
-                pipelineFileService.resolveReportPath(entry.getRunId()),
+                pipelineFileService.resolvePreferredReportPath(entry.getRunId(), entry.getTopic()),
                 visualization,
                 status.startedAt(),
                 status.finishedAt(),

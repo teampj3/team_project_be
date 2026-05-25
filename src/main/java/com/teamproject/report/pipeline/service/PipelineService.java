@@ -107,7 +107,7 @@ public class PipelineService {
                 status.searchCount(),
                 status.summaryCount(),
                 status.relevanceCount(),
-                pipelineFileService.resolveReportPath(runId),
+                pipelineFileService.resolvePreferredReportPath(runId, metadata.topic()),
                 visualization,
                 status.startedAt(),
                 status.finishedAt(),

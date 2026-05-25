@@ -172,6 +172,11 @@ class ArchiveServiceTest {
                   "visualized_report": "/app/outputs/reports/code_review_visualized.md"
                 }
                 """);
+        Files.writeString(outputsRoot.resolve("reports").resolve("code_review_visualized.md"), """
+                # Visualized Report
+
+                ![visual_1](/app/outputs/visualizations/code_review_visual_1.png)
+                """);
 
         archiveService.autoSavePipelineSnapshot(auth.userId(), reportId);
         ArchiveResponse saved = archiveService.list("Bearer " + auth.accessToken()).getFirst();
@@ -193,6 +198,10 @@ class ArchiveServiceTest {
                 .containsEntry("visual_2", "outputs/visualizations/code_review_visual_2.png");
         assertThat(detail.visualization().visualizedReportPath())
                 .isEqualTo("outputs/reports/code_review_visualized.md");
+        assertThat(detail.pipelineResult().reportPath())
+                .isEqualTo("outputs/reports/code_review_visualized.md");
+        assertThat(detail.mergedReport())
+                .contains("![visual_1](/outputs/visualizations/code_review_visual_1.png)");
     }
 
     @Test
