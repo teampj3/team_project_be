@@ -9,12 +9,13 @@ import com.teamproject.report.archive.repository.ArchiveEntryRepository;
 import com.teamproject.report.auth.model.UserAccount;
 import com.teamproject.report.auth.repository.UserAccountRepository;
 import com.teamproject.report.auth.service.AuthService;
-import com.teamproject.report.pipeline.exception.PipelineRunNotFoundException;
+import com.teamproject.report.pipeline.dto.PipelineMetadataResponse;
 import com.teamproject.report.pipeline.dto.PipelineResultResponse;
-import com.teamproject.report.pipeline.dto.RelevancePaperResponse;
 import com.teamproject.report.pipeline.dto.ReaderPaperResponse;
+import com.teamproject.report.pipeline.dto.RelevancePaperResponse;
 import com.teamproject.report.pipeline.dto.SearchPaperResponse;
 import com.teamproject.report.pipeline.dto.VisualizationInfoResponse;
+import com.teamproject.report.pipeline.exception.PipelineRunNotFoundException;
 import com.teamproject.report.pipeline.model.PipelineRunMetadata;
 import com.teamproject.report.pipeline.model.StatusSnapshot;
 import com.teamproject.report.pipeline.service.PipelineFileService;
@@ -61,7 +62,9 @@ public class ArchiveService {
         UserAccount user = authService.requireCurrentUser(authorization);
         ReportResponse report = resolveReport(request.reportId());
         String runId = resolveRunId(request.reportId());
-        String title = request.title() == null || request.title().isBlank() ? report.topic() : request.title().trim();
+        String title = request.title() == null || request.title().isBlank()
+                ? report.topic()
+                : request.title().trim();
 
         ArchiveEntry entry = archiveEntryRepository.findByUserIdAndReportId(user.getId(), request.reportId())
                 .map(existing -> {
@@ -76,7 +79,8 @@ public class ArchiveService {
     @Transactional(readOnly = true)
     public List<ArchiveResponse> list(String authorization) {
         UserAccount user = authService.requireCurrentUser(authorization);
-        return archiveEntryRepository.findAllByUserIdOrderByUpdatedAtDesc(user.getId()).stream()
+        return archiveEntryRepository.findAllByUserIdOrderByUpdatedAtDesc(user.getId())
+                .stream()
                 .map(ArchiveResponse::from)
                 .toList();
     }
@@ -102,11 +106,13 @@ public class ArchiveService {
         List<RelevancePaperResponse> relevanceResults = List.of();
 
         if (entry.getRunId() != null && !entry.getRunId().isBlank()) {
+            String runId = entry.getRunId();
+
             visualization = safeReadVisualization(entry.getTopic());
             pipelineResult = buildPipelineResult(entry, visualization);
-            searchResults = safeReadSearchResults(entry.getRunId());
-            readerResults = safeReadReaderResults(entry.getRunId());
-            relevanceResults = safeReadRelevanceResults(entry.getRunId());
+            searchResults = safeReadSearchResults(runId);
+            readerResults = safeReadReaderResults(runId);
+            relevanceResults = safeReadRelevanceResults(runId);
         }
 
         return ArchiveDetailResponse.from(
@@ -146,9 +152,11 @@ public class ArchiveService {
     public void autoSavePipelineSnapshot(UUID userId, UUID reportId) {
         UserAccount user = userAccountRepository.findById(userId).orElse(null);
         PipelineRunMetadata metadata = findPipelineMetadata(reportId).orElse(null);
+
         if (user == null || metadata == null) {
             return;
         }
+
         autoSavePipelineSnapshot(user, metadata);
     }
 
@@ -177,9 +185,12 @@ public class ArchiveService {
     }
 
     private ReportResponse buildPipelineSnapshot(PipelineRunMetadata metadata) {
-        StatusSnapshot status = safeReadStatus(metadata.runId());
-        AiReportResponse writerOutput = safeReadWriterOutput(metadata.runId());
-        String preferredReportContent = pipelineFileService.readPreferredReportContent(metadata.runId(), metadata.topic());
+        String runId = metadata.runId();
+
+        StatusSnapshot status = safeReadStatus(runId);
+        AiReportResponse writerOutput = safeReadWriterOutput(runId);
+        String preferredReportContent = pipelineFileService.readPreferredReportContent(runId, metadata.topic());
+
         var createdAt = status.startedAt() == null ? metadata.createdAt() : status.startedAt();
         var updatedAt = status.finishedAt() == null ? createdAt : status.finishedAt();
 
@@ -201,6 +212,33 @@ public class ArchiveService {
         );
     }
 
+    private PipelineResultResponse buildPipelineResult(
+            ArchiveEntry entry,
+            VisualizationInfoResponse visualization
+    ) {
+        String runId = entry.getRunId();
+        StatusSnapshot status = safeReadStatus(runId);
+
+        return new PipelineResultResponse(
+                runId,
+                entry.getReportId(),
+                entry.getTopic(),
+                status.currentStage().value(),
+                status.searchCount(),
+                status.summaryCount(),
+                status.relevanceCount(),
+                pipelineFileService.resolvePreferredReportPath(runId, entry.getTopic()),
+                visualization,
+                status.startedAt(),
+                status.finishedAt(),
+                status.status(),
+                status.message(),
+                status.errorCode(),
+                PipelineMetadataResponse.current(),
+                pipelineFileService.readReviewWriterLoop(runId)
+        );
+    }
+
     private StatusSnapshot safeReadStatus(String runId) {
         try {
             return pipelineFileService.readStatus(runId);
@@ -215,26 +253,6 @@ public class ArchiveService {
         } catch (PipelineRunNotFoundException e) {
             return new AiReportResponse("", "", List.of(), List.of(), "", "");
         }
-    }
-
-    private PipelineResultResponse buildPipelineResult(ArchiveEntry entry, VisualizationInfoResponse visualization) {
-        StatusSnapshot status = safeReadStatus(entry.getRunId());
-        return new PipelineResultResponse(
-                entry.getRunId(),
-                entry.getReportId(),
-                entry.getTopic(),
-                status.currentStage().value(),
-                status.searchCount(),
-                status.summaryCount(),
-                status.relevanceCount(),
-                pipelineFileService.resolvePreferredReportPath(entry.getRunId(), entry.getTopic()),
-                visualization,
-                status.startedAt(),
-                status.finishedAt(),
-                status.status(),
-                status.message(),
-                status.errorCode()
-        );
     }
 
     private VisualizationInfoResponse safeReadVisualization(String topic) {

@@ -1,5 +1,6 @@
 package com.teamproject.report.pipeline.controller;
 
+import com.teamproject.report.pipeline.dto.PipelineMetadataResponse;
 import com.teamproject.report.pipeline.dto.PipelineResultResponse;
 import com.teamproject.report.pipeline.dto.PipelineRunRequest;
 import com.teamproject.report.pipeline.dto.PipelineRunResponse;
@@ -34,5 +35,10 @@ public class PipelineController {
     @GetMapping("/result")
     public PipelineResultResponse result(@RequestParam String runId) {
         return pipelineService.getResult(runId);
+    }
+
+    @GetMapping("/metadata")
+    public PipelineMetadataResponse metadata() {
+        return pipelineService.getMetadata();
     }
 }

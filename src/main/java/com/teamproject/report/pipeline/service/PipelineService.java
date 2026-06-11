@@ -6,8 +6,10 @@ import com.teamproject.report.auth.model.UserAccount;
 import com.teamproject.report.auth.service.AuthService;
 import com.teamproject.report.pipeline.dto.PipelineRunRequest;
 import com.teamproject.report.pipeline.dto.PipelineResultResponse;
+import com.teamproject.report.pipeline.dto.PipelineMetadataResponse;
 import com.teamproject.report.pipeline.dto.PipelineRunResponse;
 import com.teamproject.report.pipeline.dto.RelevancePaperResponse;
+import com.teamproject.report.pipeline.dto.ReaderPaperResponse;
 import com.teamproject.report.pipeline.dto.SearchPaperResponse;
 import com.teamproject.report.pipeline.dto.VisualizationInfoResponse;
 import com.teamproject.report.pipeline.exception.PipelineRunNotFoundException;
@@ -113,7 +115,9 @@ public class PipelineService {
                 status.finishedAt(),
                 status.status(),
                 status.message(),
-                status.errorCode()
+                status.errorCode(),
+                PipelineMetadataResponse.current(),
+                pipelineFileService.readReviewWriterLoop(runId)
         );
     }
 
@@ -125,6 +129,15 @@ public class PipelineService {
     public List<RelevancePaperResponse> getRelevanceResults(String runId) {
         ensureKnownRun(runId);
         return pipelineFileService.readRelevanceResults(runId);
+    }
+
+    public List<ReaderPaperResponse> getReaderResults(String runId) {
+        ensureKnownRun(runId);
+        return pipelineFileService.readReaderResults(runId);
+    }
+
+    public PipelineMetadataResponse getMetadata() {
+        return PipelineMetadataResponse.current();
     }
 
     public AiReportResponse getWriterOutput(String runId) {

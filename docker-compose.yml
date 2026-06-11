@@ -21,6 +21,10 @@ services:
       context: /Users/jeongseog-u/VSCode-workspace/TeamProject2026
     environment:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      TEAMPROJECT_USE_MOCK_PIPELINE: ${TEAMPROJECT_USE_MOCK_PIPELINE:-}
+      TEAMPROJECT_MAX_SEARCH_RESULTS: ${TEAMPROJECT_MAX_SEARCH_RESULTS:-}
+      TEAMPROJECT_MAX_READER_PAPERS: ${TEAMPROJECT_MAX_READER_PAPERS:-}
+      TEAMPROJECT_MAX_RELEVANCE_RESULTS: ${TEAMPROJECT_MAX_RELEVANCE_RESULTS:-}
     container_name: team-project-python-ai
     volumes:
       - pipeline-outputs:/app/outputs

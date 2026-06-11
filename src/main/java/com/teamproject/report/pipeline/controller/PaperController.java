@@ -1,6 +1,7 @@
 package com.teamproject.report.pipeline.controller;
 
 import com.teamproject.report.pipeline.dto.RelevancePaperResponse;
+import com.teamproject.report.pipeline.dto.ReaderPaperResponse;
 import com.teamproject.report.pipeline.dto.SearchPaperResponse;
 import com.teamproject.report.pipeline.service.PipelineService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,5 +29,10 @@ public class PaperController {
     @GetMapping("/relevance-results")
     public List<RelevancePaperResponse> relevanceResults(@RequestParam String runId) {
         return pipelineService.getRelevanceResults(runId);
+    }
+
+    @GetMapping("/reader-results")
+    public List<ReaderPaperResponse> readerResults(@RequestParam String runId) {
+        return pipelineService.getReaderResults(runId);
     }
 }

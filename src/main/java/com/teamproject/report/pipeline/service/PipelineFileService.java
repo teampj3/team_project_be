@@ -2,6 +2,7 @@ package com.teamproject.report.pipeline.service;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.teamproject.report.config.PipelineProperties;
@@ -169,6 +170,19 @@ public class PipelineFileService {
             return objectMapper.readValue(writerPath.toFile(), AiReportResponse.class);
         } catch (IOException e) {
             throw new IllegalStateException("Failed to read writer output file", e);
+        }
+    }
+
+    public JsonNode readReviewWriterLoop(String runId) {
+        Path loopPath = resolveRunDir(runId).resolve("review_writer_loop.json");
+        if (!Files.exists(loopPath)) {
+            return objectMapper.createObjectNode();
+        }
+
+        try {
+            return objectMapper.readTree(loopPath.toFile());
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed to read review writer loop file", e);
         }
     }
 

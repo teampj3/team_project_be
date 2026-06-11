@@ -1,5 +1,6 @@
 package com.teamproject.report.pipeline.dto;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.teamproject.report.report.model.ReportStatus;
 
 import java.time.Instant;
@@ -19,6 +20,8 @@ public record PipelineResultResponse(
         Instant finishedAt,
         ReportStatus status,
         String message,
-        String errorCode
+        String errorCode,
+        PipelineMetadataResponse pipelineMetadata,
+        JsonNode reviewWriterLoop
 ) {
 }
